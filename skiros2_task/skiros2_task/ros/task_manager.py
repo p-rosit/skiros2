@@ -70,7 +70,8 @@ class TaskManagerNode(PrettyObject, Node):
         if self._skills is None or self._sli.has_changes:
             log.info("Updating skills")
             self._skills = {}
-            for ak, e in self._sli._agents.items():
+            agents = self._sli._agents.copy()
+            for ak, e in agents.items():
                 for sk, s in e.skills.items():
                     if not s.available_for_planning:
                         log.info(f"'{sk}' not available for planning, skipping")
@@ -95,6 +96,9 @@ class TaskManagerNode(PrettyObject, Node):
             log.info("[Goal]", goal_handle.request.goals)
             self._result = action_msgs.AssignTask.Result()        
             self._current_goals = goal_handle.request.goals
+            if not self._current_goals or self._current_goals[0] != "(" or self._current_goals[-1] != ")":
+                _set_result(1, f"Invalid goal format. Expected '(<goal condition>)'. Got goal '{self._current_goals.replace("\n", "")}'", False)
+                return self._result
             plan = self._task_plan()
             log.info("[Plan]", plan)
             if plan is None:
@@ -295,11 +299,16 @@ class TaskManagerNode(PrettyObject, Node):
                     g = g[1:-1]
                     tokens = g.split(" ")
                     if len(tokens) == 3:
-                        self._pddl_interface.addGoal(pddl.GroundPredicate(tokens[0], [tokens[1], tokens[2]]))
-                        if tokens[1].find("-") == -1:  # If isAbstractObject
-                            self._abstract_objects.append(self._wmi.get_template_element(tokens[1]))
-                        if tokens[2].find("-") == -1:  # If isAbstractObject
-                            self._abstract_objects.append(self._wmi.get_template_element(tokens[2]))
+                        if "not" in tokens:
+                            self._pddl_interface.addGoal(pddl.GroundPredicate(tokens[1], [tokens[2]], value=False))
+                            if tokens[2].find("-") == -1:  # If isAbstractObject
+                                self._abstract_objects.append(self._wmi.get_template_element(tokens[2]))
+                        else:
+                            self._pddl_interface.addGoal(pddl.GroundPredicate(tokens[0], [tokens[1], tokens[2]]))
+                            if tokens[1].find("-") == -1:  # If isAbstractObject
+                                self._abstract_objects.append(self._wmi.get_template_element(tokens[1]))
+                            if tokens[2].find("-") == -1:  # If isAbstractObject
+                                self._abstract_objects.append(self._wmi.get_template_element(tokens[2]))
                     else:
                         self._pddl_interface.addGoal(pddl.GroundPredicate(tokens[0], [tokens[1]]))
                         if tokens[1].find("-") == -1:  # If isAbstractObject

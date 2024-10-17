@@ -616,7 +616,8 @@ class SkirosWidget(QWidget, SkirosInteractiveMarkers):
         # Update robot BT rate
         if self._sli.agents:
             robot_info = ""
-            for name, manager in self._sli.agents.items():
+            agents = self._sli.agents.copy()
+            for name, manager in agents.items():
                 robot_info += "{}: {:0.1f}hz ".format(name.replace("/", ""), manager.get_tick_rate())
             self.robot_rate_info.setText(robot_info)
             self.robot_output.setText(self.robot_text)
@@ -636,7 +637,8 @@ class SkirosWidget(QWidget, SkirosInteractiveMarkers):
         fu.setExpanded(True)
         root = QTreeWidgetItem(self.skill_tree_widget, ["All", "All"])
         root.setExpanded(True)
-        for ak, e in self._sli._agents.items():
+        agents = self._sli._agents.copy()
+        for ak, e in agents.items():
             for s in e.get_skill_list().values():
                 s.manager = ak
                 self._add_available_skill(s)
@@ -1249,6 +1251,9 @@ class SkirosWidget(QWidget, SkirosInteractiveMarkers):
         stype = self.skill_tree_widget.findItems(s.type, Qt.MatchRecursive | Qt.MatchFixedString, 1)
         if not stype:  # If it is the first of its type, add the parents hierarchy to the tree
             hierarchy = self._wmi.query_ontology('SELECT ?x {{ {} rdfs:subClassOf*  ?x }}'.format(s.type))
+            if "skiros:Skill" not in hierarchy:
+                log.warn("[add_available_skill]", f"Skill {s.name} is not a subclass of 'skiros:Skill'. Ignoring.")
+                return
             hierarchy = hierarchy[:hierarchy.index("skiros:Skill")]
             hierarchy.reverse()
             parent = self.skill_tree_widget.findItems("All", Qt.MatchRecursive | Qt.MatchFixedString, 1)[0]
